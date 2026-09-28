@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Escape Game AR - Cibles Personnalisées</title>
+  <title>Escape Game AR - Cadenas à Molettes</title>
   
   <style>
     * {
@@ -34,14 +34,14 @@
       width: 90%;
       max-width: 420px;
       padding: 14px 20px;
-      background: rgba(18, 18, 28, 0.75);
+      background: rgba(18, 18, 28, 0.85);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.2);
       border-radius: 16px;
       color: #ffffff;
       text-align: center;
-      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
       z-index: 10;
       transition: all 0.3s ease;
     }
@@ -75,7 +75,6 @@
       cursor: pointer;
       box-shadow: 0 10px 25px rgba(79, 172, 254, 0.4);
       z-index: 10;
-      transition: transform 0.2s, box-shadow 0.2s;
     }
     #start-btn:active {
       transform: translateX(-50%) scale(0.95);
@@ -96,7 +95,7 @@
 
   <div id="hud">
     <div id="status-title">Prêt à démarrer</div>
-    <div id="status-desc">Cliquez sur le bouton ci-dessous pour lancer la caméra AR.</div>
+    <div id="status-desc">Cliquez sur le bouton ci-dessous pour lancer l'expérience AR.</div>
   </div>
 
   <button id="start-btn">DÉMARRER L'EXPÉRIENCE</button>
@@ -110,7 +109,7 @@
     const statusDesc = document.getElementById('status-desc');
     const startBtn = document.getElementById('start-btn');
 
-    // CHARGEMENT DE TON FICHIER LOCAL TARGETS.MIND
+    // INITIALISATION MINDAR
     const mindarThree = new MindARThree({
       container: document.querySelector("#container"),
       imageTargetSrc: "./targets.mind"
@@ -119,14 +118,14 @@
     const { renderer, scene, camera } = mindarThree;
 
     // ÉCLAIRAGE
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
     scene.add(ambientLight);
 
     const dirLight = new THREE.DirectionalLight(0xffffff, 2.0);
     dirLight.position.set(2, 4, 3);
     scene.add(dirLight);
 
-    // AUDIO SPATIALISÉ
+    // AUDIO SPATIAL
     const listener = new THREE.AudioListener();
     camera.add(listener);
 
@@ -168,33 +167,43 @@
     positionalSuccess.setBuffer(createSuccessBuffer(listener.context));
     positionalSuccess.setRefDistance(0.5);
 
-    // CADENAS 3D
+    // CADENAS 3D (GEOMETRIE ET POSITIONNEMENT CORRIGÉS)
     const padlockGroup = new THREE.Group();
-    padlockGroup.scale.set(0.6, 0.6, 0.6);
+    padlockGroup.scale.set(0.7, 0.7, 0.7);
 
     padlockGroup.add(positionalClick);
     padlockGroup.add(positionalSuccess);
 
-    const bodyMat = new THREE.MeshPhongMaterial({ color: 0xc59b27, shininess: 80 });
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.32, 0.15), bodyMat);
+    // 1. Corps du cadenas (Profondeur Z = 0.08)
+    const bodyMat = new THREE.MeshPhongMaterial({ color: 0xd4af37, shininess: 90 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.32, 0.08), bodyMat);
     padlockGroup.add(body);
 
-    const shackleMat = new THREE.MeshPhongMaterial({ color: 0xe0e0e0, shininess: 120 });
+    // 2. Anse du cadenas
+    const shackleMat = new THREE.MeshPhongMaterial({ color: 0xeeeeee, shininess: 120 });
     const shackle = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.022, 16, 32, Math.PI), shackleMat);
     shackle.position.set(0, 0.16, 0);
     padlockGroup.add(shackle);
 
+    // 3. Texture haute lisibilité pour les molettes
     function createDigitTexture() {
       const canvas = document.createElement('canvas');
       canvas.width = 1280;
       canvas.height = 128;
       const ctx = canvas.getContext('2d');
 
-      ctx.fillStyle = '#f0f0f0';
+      // Fond blanc
+      ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, 1280, 128);
 
+      // Bordures haut/bas noires
       ctx.fillStyle = '#111111';
-      ctx.font = 'Bold 72px sans-serif';
+      ctx.fillRect(0, 0, 1280, 10);
+      ctx.fillRect(0, 118, 1280, 10);
+
+      // Chiffres 0 à 9
+      ctx.fillStyle = '#000000';
+      ctx.font = 'Bold 82px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
@@ -208,43 +217,48 @@
 
       const texture = new THREE.CanvasTexture(canvas);
       texture.wrapS = THREE.RepeatWrapping;
-      texture.offset.x = -0.05;
       return texture;
     }
 
+    // 4. Molettes (Positionnées en Z = 0.035 pour sortir en relief)
     const wheels = [];
     const currentDigits = [0, 0, 0, 0];
     const SECRET_CODE = "4207";
     const digitTexture = createDigitTexture();
-    const wheelGeo = new THREE.CylinderGeometry(0.052, 0.052, 0.08, 32);
+    
+    // Cylindres plus grands (rayon 0.058)
+    const wheelGeo = new THREE.CylinderGeometry(0.058, 0.058, 0.08, 32);
 
     for (let i = 0; i < 4; i++) {
-      const wheelMat = new THREE.MeshPhongMaterial({ map: digitTexture, shininess: 30 });
+      const wheelMat = new THREE.MeshPhongMaterial({ map: digitTexture, shininess: 40 });
       const wheel = new THREE.Mesh(wheelGeo, wheelMat);
       wheel.rotation.z = Math.PI / 2;
-      wheel.position.x = -0.18 + i * 0.12;
+      
+      // Placées sur la face avant (Z = 0.035)
+      wheel.position.set(-0.18 + i * 0.12, 0, 0.035);
       wheel.userData = { index: i };
+      
       padlockGroup.add(wheel);
       wheels.push(wheel);
     }
 
-    // ANCRAGE DE L'IMAGE
+    // ANCRAGE IMAGE
     const anchor = mindarThree.addAnchor(0);
     anchor.group.add(padlockGroup);
 
     anchor.onTargetFound = () => {
       statusTitle.textContent = "Cible Détectée !";
       statusTitle.style.color = "#00ff88";
-      statusDesc.textContent = "Composez le code secret (4207) en touchant les molettes.";
+      statusDesc.textContent = "Composez le code secret (4207) en touchant les 4 molettes.";
     };
 
     anchor.onTargetLost = () => {
       statusTitle.textContent = "Recherche d'image";
       statusTitle.style.color = "#ffcc00";
-      statusDesc.textContent = "Pointez votre image personnalisée vers la caméra.";
+      statusDesc.textContent = "Pointez la caméra vers l'image du livre.";
     };
 
-    // LOGIQUE
+    // LOGIQUE DE ROTATION DU CODE
     function rotateWheel(index) {
       unlockAudio();
       currentDigits[index] = (currentDigits[index] + 1) % 10;
@@ -262,23 +276,20 @@
         bodyMat.color.setHex(0x00cc66);
         statusTitle.textContent = "DÉVERROUILLÉ !";
         statusTitle.style.color = "#00ff88";
-        statusDesc.textContent = "Félicitations, vous avez trouvé la combinaison !";
+        statusDesc.textContent = "Bravo, le cadenas est ouvert !";
 
         if (positionalSuccess.isPlaying) positionalSuccess.stop();
         positionalSuccess.play();
       }
     }
 
-    // RAYCASTING
+    // DELECTATION DES TAPS SUR ECRAN
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
 
-    window.addEventListener('pointerdown', (e) => {
-      if (e.target.tagName === 'BUTTON' || e.target.closest('#hud')) return;
-
-      unlockAudio();
-      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    function handleInteraction(clientX, clientY) {
+      mouse.x = (clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(clientY / window.innerHeight) * 2 + 1;
 
       raycaster.setFromCamera(mouse, camera);
       const intersects = raycaster.intersectObjects(wheels);
@@ -286,72 +297,41 @@
       if (intersects.length > 0) {
         rotateWheel(intersects[0].object.userData.index);
       }
-    });
-
-    // GESTES TACTILES
-    let previousTouch = null;
-    let initialPinchDistance = null;
-    let initialScale = 0.6;
-
-    function getTouchDistance(touches) {
-      const dx = touches[0].clientX - touches[1].clientX;
-      const dy = touches[0].clientY - touches[1].clientY;
-      return Math.hypot(dx, dy);
     }
 
-    window.addEventListener('touchstart', (e) => {
+    window.addEventListener('pointerdown', (e) => {
       if (e.target.tagName === 'BUTTON' || e.target.closest('#hud')) return;
-
-      if (e.touches.length === 1) {
-        previousTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      } else if (e.touches.length === 2) {
-        previousTouch = null;
-        initialPinchDistance = getTouchDistance(e.touches);
-        initialScale = padlockGroup.scale.x;
-      }
+      unlockAudio();
+      handleInteraction(e.clientX, e.clientY);
     });
 
-    window.addEventListener('touchmove', (e) => {
-      if (e.target.tagName === 'BUTTON' || e.target.closest('#hud')) return;
-
-      if (e.touches.length === 1 && previousTouch) {
-        const deltaX = e.touches[0].clientX - previousTouch.x;
-        padlockGroup.rotation.y += deltaX * 0.008;
-        previousTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      } else if (e.touches.length === 2 && initialPinchDistance) {
-        const currentDistance = getTouchDistance(e.touches);
-        const factor = currentDistance / initialPinchDistance;
-        const newScale = Math.min(Math.max(initialScale * factor, 0.2), 2.0);
-        padlockGroup.scale.set(newScale, newScale, newScale);
-      }
-    });
-
-    window.addEventListener('touchend', (e) => {
-      if (e.touches.length < 2) initialPinchDistance = null;
-      if (e.touches.length === 0) previousTouch = null;
-    });
-
-    // DEMARRAGE
+    // DÉMARRAGE DU SCRIPT
     startBtn.addEventListener('click', async () => {
       unlockAudio();
       startBtn.style.display = 'none';
       statusTitle.textContent = "Chargement des cibles...";
-      statusDesc.textContent = "Patience, analyse du fichier targets.mind en cours.";
+      statusDesc.textContent = "Analyse du fichier targets.mind...";
 
       try {
+        const response = await fetch('./targets.mind');
+        if (!response.ok) {
+          throw new Error("Fichier 'targets.mind' introuvable.");
+        }
+
         await mindarThree.start();
         statusTitle.textContent = "Recherche d'image";
         statusTitle.style.color = "#ffcc00";
-        statusDesc.textContent = "Pointez votre caméra vers l'image utilisée pour générer targets.mind.";
+        statusDesc.textContent = "Pointez votre caméra vers l'image du livre.";
 
         renderer.setAnimationLoop(() => {
           renderer.render(scene, camera);
         });
+
       } catch (err) {
         console.error(err);
         statusTitle.textContent = "Erreur de chargement";
         statusTitle.style.color = "#ff4444";
-        statusDesc.textContent = "Impossible de lire './targets.mind'. Vérifiez qu'il est bien à la racine de votre dépôt GitHub.";
+        statusDesc.textContent = err.message;
       }
     });
   </script>
