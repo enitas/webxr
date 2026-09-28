@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Escape Game AR - Cavalier 3D Sur Mesure</title>
+  <title>Escape Game AR - Cavalier 3D</title>
   
   <style>
     * {
@@ -43,7 +43,7 @@
       color: #e2d1c3;
       text-align: center;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
-      z-index: 10;
+      z-index: 100;
       pointer-events: none;
     }
     #status-title {
@@ -75,11 +75,28 @@
       text-transform: uppercase;
       cursor: pointer;
       box-shadow: 0 8px 25px rgba(212, 175, 55, 0.3);
-      z-index: 10;
+      z-index: 100;
       pointer-events: auto;
     }
     #start-btn:active {
       transform: translateX(-50%) scale(0.96);
+    }
+
+    /* CONSOLE D'ERREUR SUR L'ÉCRAN */
+    #error-console {
+      display: none;
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      right: 10px;
+      padding: 12px;
+      background: rgba(180, 20, 20, 0.9);
+      color: #ffffff;
+      font-family: monospace;
+      font-size: 11px;
+      border-radius: 8px;
+      z-index: 200;
+      word-break: break-all;
     }
   </style>
 
@@ -96,34 +113,54 @@
 <body>
 
   <div id="hud">
-    <div id="status-title">RECHERCHE EN COURS</div>
-    <div id="status-desc">Pointez la caméra vers l'image cible.</div>
+    <div id="status-title">AR ESCAPE GAME</div>
+    <div id="status-desc">Appuyez sur le bouton pour démarrer.</div>
   </div>
 
   <button id="start-btn">DÉMARRER L'EXPÉRIENCE</button>
+  <div id="error-console"></div>
   <div id="container"></div>
 
   <script type="module">
     import * as THREE from 'three';
     import { MindARThree } from 'mindar-image-three';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
     const statusTitle = document.getElementById('status-title');
     const statusDesc = document.getElementById('status-desc');
     const startBtn = document.getElementById('start-btn');
+    const errConsole = document.getElementById('error-console');
+
+    // CONSOLE DE DÉBOGAGE
+    function showError(msg) {
+      errConsole.style.display = 'block';
+      errConsole.textContent = '❌ ' + msg;
+      statusTitle.textContent = "ERREUR";
+      statusTitle.style.color = "#ff4444";
+      statusDesc.textContent = "Détails affichés en bas de l'écran.";
+    }
+
+    window.addEventListener('error', (e) => showError(e.message));
+    window.addEventListener('unhandledrejection', (e) => showError(e.reason));
 
     // 1. INITIALISATION MINDAR
-    const mindarThree = new MindARThree({
-      container: document.querySelector("#container"),
-      imageTargetSrc: "./targets.mind"
-    });
+    let mindarThree;
+    try {
+      mindarThree = new MindARThree({
+        container: document.querySelector("#container"),
+        imageTargetSrc: "./targets.mind"
+      });
+    } catch (e) {
+      showError("Erreur d'initialisation MindAR: " + e.message);
+    }
 
     const { renderer, scene, camera } = mindarThree;
 
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
 
-    // 2. ÉCLAIRAGE DE STUDIO
+    // 2. ÉCLAIRAGE
     const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
     scene.add(ambientLight);
 
@@ -131,15 +168,11 @@
     mainLight.position.set(3, 5, 4);
     scene.add(mainLight);
 
-    const fillLight = new THREE.DirectionalLight(0x88aaff, 0.8);
-    fillLight.position.set(-3, 2, -2);
-    scene.add(fillLight);
-
     const bottomLight = new THREE.DirectionalLight(0xffeedd, 2.5);
     bottomLight.position.set(0, -5, 0);
     scene.add(bottomLight);
 
-    // 3. TEXTURE DU CODE SOUS LE SOCLE
+    // 3. TEXTURE DU SOCLE (GRAVURE "314")
     function createBottomNumberTexture(numberStr) {
       const canvas = document.createElement('canvas');
       canvas.width = 512;
@@ -165,22 +198,25 @@
       return new THREE.CanvasTexture(canvas);
     }
 
-    // 4. CHARGEMENT ROBUSTE DU FICHIER .GLB
+    // 4. CHARGEMENT MODÈLE 3D AVEC DÉCODEUR DRACO
     const mainGroup = new THREE.Group();
     const SECRET_NUMBER = "314";
+
+    const dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+
     const loader = new GLTFLoader();
+    loader.setDRACOLoader(dracoLoader);
 
-    function loadCustomGLB() {
+    const FALLBACK_URL = 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/ChessPiece/glTF-Binary/ChessPiece.glb';
+
+    function loadModel(url) {
       return new Promise((resolve, reject) => {
-        // Tente de charger le fichier dans le dossier courant
-        const modelPath = 'cavalier.glb';
-
         loader.load(
-          modelPath,
+          url,
           (gltf) => {
             const model = gltf.scene;
 
-            // Recalcul du centrage et de la taille
             const box = new THREE.Box3().setFromObject(model);
             const size = box.getSize(new THREE.Vector3());
             const center = box.getCenter(new THREE.Vector3());
@@ -193,7 +229,6 @@
             const targetScale = 0.8 / (maxDim || 1);
             model.scale.setScalar(targetScale);
 
-            // Création du disque du socle
             const baseRadius = (Math.max(size.x, size.z) * targetScale) / 2;
             const bottomGeo = new THREE.CircleGeometry(Math.max(baseRadius, 0.25), 36);
             const numTexture = createBottomNumberTexture(SECRET_NUMBER);
@@ -214,18 +249,25 @@
           (xhr) => {
             if (xhr.lengthComputable && xhr.total > 0) {
               const percent = Math.round((xhr.loaded / xhr.total) * 100);
-              statusDesc.textContent = `Téléchargement du fichier 3D : ${percent}%`;
-            } else {
-              statusDesc.textContent = `Téléchargement en cours... (${(xhr.loaded / 1024 / 1024).toFixed(1)} Mo)`;
+              statusDesc.textContent = `Chargement 3D : ${percent}%`;
             }
           },
-          (error) => {
-            console.error("Erreur de chargement GLTF:", error);
-            const detail = error.message || (error.target && error.target.status ? `HTTP ${error.target.status}` : "Format ou réseau non valide");
-            reject(`Erreur 'cavalier.glb' : ${detail}`);
-          }
+          (err) => reject(err)
         );
       });
+    }
+
+    async function setup3DModel() {
+      try {
+        await loadModel('./cavalier.glb');
+      } catch (e) {
+        console.warn("Échec cavalier.glb local, tentative de secours sur le modèle distant...", e);
+        try {
+          await loadModel(FALLBACK_URL);
+        } catch (errFallback) {
+          throw new Error("Impossible de charger le modèle 3D : " + (e.message || "Fichier invalide"));
+        }
+      }
     }
 
     // ANCRAGE MINDAR
@@ -244,7 +286,7 @@
       statusDesc.textContent = "Pointez la caméra vers l'image cible.";
     };
 
-    // 5. CONTRÔLES TACTILES (ROTATION ET ZOOM)
+    // 5. CONTRÔLES TACTILES
     let currentScale = 1.0;
     let isPointerDown = false;
     let lastPointerX = 0, lastPointerY = 0;
@@ -300,39 +342,14 @@
       if (e.touches.length === 0) isPointerDown = false;
     });
 
-    let isMouseDown = false;
-    window.addEventListener('mousedown', (e) => {
-      if (e.target.id === 'start-btn') return;
-      isMouseDown = true;
-      lastPointerX = e.clientX;
-      lastPointerY = e.clientY;
-    });
-
-    window.addEventListener('mousemove', (e) => {
-      if (!isMouseDown) return;
-      const dx = e.clientX - lastPointerX;
-      const dy = e.clientY - lastPointerY;
-
-      mainGroup.rotation.y += dx * 0.01;
-      mainGroup.rotation.x += dy * 0.01;
-
-      lastPointerX = e.clientX;
-      lastPointerY = e.clientY;
-    });
-
-    window.addEventListener('mouseup', () => { isMouseDown = false; });
-
     // DÉMARRAGE
     startBtn.addEventListener('click', async () => {
       startBtn.style.display = 'none';
       statusTitle.textContent = "CHARGEMENT";
-      statusDesc.textContent = "Initialisation...";
+      statusDesc.textContent = "Préparation de la caméra et du modèle...";
 
       try {
-        const response = await fetch('./targets.mind');
-        if (!response.ok) throw new Error("Fichier 'targets.mind' introuvable.");
-
-        await loadCustomGLB();
+        await setup3DModel();
         await mindarThree.start();
 
         statusTitle.textContent = "RECHERCHE EN COURS";
@@ -343,10 +360,7 @@
         });
 
       } catch (err) {
-        console.error(err);
-        statusTitle.textContent = "ERREUR";
-        statusTitle.style.color = "#ff4444";
-        statusDesc.textContent = typeof err === 'string' ? err : err.message;
+        showError(err.message || err);
       }
     });
   </script>
