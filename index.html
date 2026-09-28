@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Escape Game AR - Cadenas à Molettes</title>
+  <title>Escape Game AR - Cadenas 3D</title>
   
   <style>
     * {
@@ -11,10 +11,11 @@
       margin: 0;
       padding: 0;
       user-select: none;
+      touch-action: none; /* Empêche le défilement de la page sur mobile */
     }
     body {
       overflow: hidden;
-      background-color: #0d0d11;
+      background-color: #08080c;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     #container {
@@ -32,51 +33,53 @@
       left: 50%;
       transform: translateX(-50%);
       width: 90%;
-      max-width: 420px;
+      max-width: 400px;
       padding: 14px 20px;
-      background: rgba(18, 18, 28, 0.85);
+      background: rgba(15, 18, 28, 0.88);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(212, 175, 55, 0.4);
       border-radius: 16px;
       color: #ffffff;
       text-align: center;
-      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
       z-index: 10;
+      pointer-events: none; /* Laisse passer les clics au canevas 3D */
     }
     #status-title {
-      font-size: 15px;
-      font-weight: 700;
-      letter-spacing: 0.5px;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 1px;
       text-transform: uppercase;
-      color: #a0a5c0;
+      color: #d4af37;
       margin-bottom: 4px;
     }
     #status-desc {
       font-size: 13px;
-      color: #e0e6ff;
+      color: #cbd5e1;
     }
 
     #start-btn {
       position: absolute;
-      bottom: 40px;
+      bottom: 36px;
       left: 50%;
       transform: translateX(-50%);
       padding: 16px 36px;
-      background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+      background: linear-gradient(135deg, #d4af37 0%, #aa7c11 100%);
       border: none;
       border-radius: 30px;
-      color: #000000;
-      font-size: 16px;
-      font-weight: 800;
+      color: #0d0f14;
+      font-size: 15px;
+      font-weight: 900;
       letter-spacing: 1px;
       text-transform: uppercase;
       cursor: pointer;
-      box-shadow: 0 10px 25px rgba(79, 172, 254, 0.4);
+      box-shadow: 0 8px 25px rgba(212, 175, 55, 0.3);
       z-index: 10;
+      pointer-events: auto;
     }
     #start-btn:active {
-      transform: translateX(-50%) scale(0.95);
+      transform: translateX(-50%) scale(0.96);
     }
   </style>
 
@@ -93,8 +96,8 @@
 <body>
 
   <div id="hud">
-    <div id="status-title">Prêt à démarrer</div>
-    <div id="status-desc">Cliquez sur le bouton ci-dessous pour lancer l'expérience AR.</div>
+    <div id="status-title">Initialisation</div>
+    <div id="status-desc">Cliquez sur le bouton pour démarrer la caméra.</div>
   </div>
 
   <button id="start-btn">DÉMARRER L'EXPÉRIENCE</button>
@@ -108,7 +111,7 @@
     const statusDesc = document.getElementById('status-desc');
     const startBtn = document.getElementById('start-btn');
 
-    // INITIALISATION MINDAR
+    // 1. INITIALISATION MINDAR
     const mindarThree = new MindARThree({
       container: document.querySelector("#container"),
       imageTargetSrc: "./targets.mind"
@@ -116,15 +119,22 @@
 
     const { renderer, scene, camera } = mindarThree;
 
-    // ÉCLAIRAGE
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.6);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
+
+    // 2. ÉCLAIRAGE
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
     scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 2.2);
-    dirLight.position.set(2, 5, 4);
-    scene.add(dirLight);
+    const dirLight1 = new THREE.DirectionalLight(0xfff8e7, 2.5);
+    dirLight1.position.set(3, 5, 4);
+    scene.add(dirLight1);
 
-    // AUDIO SPATIAL
+    const dirLight2 = new THREE.DirectionalLight(0x90b0ff, 1.0);
+    dirLight2.position.set(-3, -2, 2);
+    scene.add(dirLight2);
+
+    // 3. AUDIO SPATIAL
     const listener = new THREE.AudioListener();
     camera.add(listener);
 
@@ -136,11 +146,11 @@
 
     function createClickBuffer(audioCtx) {
       const sampleRate = audioCtx.sampleRate;
-      const buffer = audioCtx.createBuffer(1, sampleRate * 0.05, sampleRate);
+      const buffer = audioCtx.createBuffer(1, sampleRate * 0.04, sampleRate);
       const data = buffer.getChannelData(0);
       for (let i = 0; i < data.length; i++) {
         const t = i / sampleRate;
-        data[i] = Math.sin(2 * Math.PI * 300 * t) * Math.exp(-t * 100);
+        data[i] = Math.sin(2 * Math.PI * 320 * t) * Math.exp(-t * 110);
       }
       return buffer;
     }
@@ -151,7 +161,7 @@
       const data = buffer.getChannelData(0);
       for (let i = 0; i < data.length; i++) {
         const t = i / sampleRate;
-        const freq = 523.25 + (t / 0.5) * 523.25;
+        const freq = 440 + (t / 0.5) * 440;
         data[i] = Math.sin(2 * Math.PI * freq * t) * Math.exp(-t * 4);
       }
       return buffer;
@@ -166,56 +176,109 @@
     positionalSuccess.setBuffer(createSuccessBuffer(listener.context));
     positionalSuccess.setRefDistance(0.5);
 
-    // CADENAS 3D (STRUCTURE ET ALIGNEMENT)
+    // 4. ASSEMBLAGE DU CADENAS ET GROUPE INTERACTIF
     const padlockGroup = new THREE.Group();
-    padlockGroup.scale.set(0.75, 0.75, 0.75);
+    padlockGroup.scale.set(0.85, 0.85, 0.85);
 
     padlockGroup.add(positionalClick);
     padlockGroup.add(positionalSuccess);
 
-    // 1. Corps du cadenas en laiton
-    const bodyMat = new THREE.MeshPhongMaterial({ color: 0xd4af37, shininess: 80 });
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.36, 0.12), bodyMat);
+    // MATÉRIAUX
+    const brassMat = new THREE.MeshStandardMaterial({ color: 0xc89d2a, metalness: 0.85, roughness: 0.25 });
+    const chromeMat = new THREE.MeshStandardMaterial({ color: 0xf0f0f0, metalness: 0.95, roughness: 0.1 });
+    const darkMat = new THREE.MeshStandardMaterial({ color: 0x181a20, metalness: 0.8, roughness: 0.4 });
+
+    // A. Corps du cadenas
+    const shape = new THREE.Shape();
+    const w = 0.46, h = 0.32, r = 0.04;
+    shape.moveTo(-w/2 + r, -h/2);
+    shape.lineTo(w/2 - r, -h/2);
+    shape.quadraticCurveTo(w/2, -h/2, w/2, -h/2 + r);
+    shape.lineTo(w/2, h/2 - r);
+    shape.quadraticCurveTo(w/2, h/2, w/2 - r, h/2);
+    shape.lineTo(-w/2 + r, h/2);
+    shape.quadraticCurveTo(-w/2, h/2, -w/2, h/2 - r);
+    shape.lineTo(-w/2, -h/2 + r);
+    shape.quadraticCurveTo(-w/2, -h/2, -w/2 + r, -h/2);
+
+    const bodyGeo = new THREE.ExtrudeGeometry(shape, {
+      depth: 0.10,
+      bevelEnabled: true,
+      bevelThickness: 0.01,
+      bevelSize: 0.01,
+      bevelSegments: 3
+    });
+    bodyGeo.center();
+    const body = new THREE.Mesh(bodyGeo, brassMat);
     padlockGroup.add(body);
 
-    // 2. Plaque noire arrière pour les molettes
-    const slotMat = new THREE.MeshBasicMaterial({ color: 0x111116 });
-    const slotPlate = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.16, 0.02), slotMat);
-    slotPlate.position.set(0, 0, 0.051);
-    padlockGroup.add(slotPlate);
+    // B. Logement molettes
+    const slotGeo = new THREE.BoxGeometry(0.38, 0.14, 0.04);
+    const slot = new THREE.Mesh(slotGeo, darkMat);
+    slot.position.set(0, -0.01, 0.042);
+    padlockGroup.add(slot);
 
-    // 3. Anse chromée
-    const shackleMat = new THREE.MeshPhongMaterial({ color: 0xe6e6e6, shininess: 120 });
-    const shackle = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.024, 16, 32, Math.PI), shackleMat);
-    shackle.position.set(0, 0.18, 0);
-    padlockGroup.add(shackle);
+    // C. Bagues de finition fixes
+    const collarGeo = new THREE.CylinderGeometry(0.028, 0.028, 0.02, 24);
+    const collarL = new THREE.Mesh(collarGeo, brassMat);
+    collarL.position.set(-0.12, 0.165, 0);
+    const collarR = new THREE.Mesh(collarGeo, brassMat);
+    collarR.position.set(0.12, 0.165, 0);
+    padlockGroup.add(collarL);
+    padlockGroup.add(collarR);
 
-    // 4. Génération de la texture des chiffres (Bien orientés)
+    // D. Diode LED
+    const ledMat = new THREE.MeshStandardMaterial({
+      color: 0xff0033,
+      emissive: 0xff0022,
+      emissiveIntensity: 2.0,
+      roughness: 0.2
+    });
+    const led = new THREE.Mesh(new THREE.SphereGeometry(0.014, 16, 16), ledMat);
+    led.position.set(0, 0.11, 0.052);
+    padlockGroup.add(led);
+
+    // E. Anse avec tiges coulissantes longues
+    const shackleGroup = new THREE.Group();
+    shackleGroup.position.set(0, 0.07, 0);
+
+    const arch = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.021, 16, 32, Math.PI), chromeMat);
+    arch.position.set(0, 0.11, 0);
+    shackleGroup.add(arch);
+
+    const legL = new THREE.Mesh(new THREE.CylinderGeometry(0.021, 0.021, 0.22, 24), chromeMat);
+    legL.position.set(-0.12, 0.0, 0);
+    shackleGroup.add(legL);
+
+    const legR = new THREE.Mesh(new THREE.CylinderGeometry(0.021, 0.021, 0.22, 24), chromeMat);
+    legR.position.set(0.12, 0.0, 0);
+    shackleGroup.add(legR);
+
+    padlockGroup.add(shackleGroup);
+
+    // F. TEXTURE MOLETTES
     function createDigitTexture() {
       const canvas = document.createElement('canvas');
       canvas.width = 1280;
       canvas.height = 128;
       const ctx = canvas.getContext('2d');
 
-      // Fond argenté / gris très clair
-      ctx.fillStyle = '#e2e8f0';
+      ctx.fillStyle = '#22252e';
       ctx.fillRect(0, 0, 1280, 128);
 
-      // Lignes de séparation haut et bas
-      ctx.fillStyle = '#334155';
-      ctx.fillRect(0, 0, 1280, 8);
-      ctx.fillRect(0, 120, 1280, 8);
+      ctx.fillStyle = '#d4af37';
+      ctx.fillRect(0, 0, 1280, 5);
+      ctx.fillRect(0, 123, 1280, 5);
 
-      // Dessin des chiffres 0 à 9
-      ctx.fillStyle = '#0f172a';
-      ctx.font = '900 76px sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'Bold 76px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
       for (let i = 0; i < 10; i++) {
         ctx.save();
         ctx.translate(i * 128 + 64, 64);
-        ctx.rotate(Math.PI / 2); // Orienté pour l'axe horizontal
+        ctx.rotate(Math.PI / 2);
         ctx.fillText(i.toString(), 0, 0);
         ctx.restore();
       }
@@ -225,51 +288,48 @@
       return texture;
     }
 
-    // 5. Création des 4 molettes (Axe X horizontal)
+    // G. MOLETTES
     const wheels = [];
     const currentDigits = [0, 0, 0, 0];
+    const targetRotations = [0, 0, 0, 0];
     const SECRET_CODE = "4207";
     const digitTexture = createDigitTexture();
 
-    // Géométrie tournée de 90° sur Z pour que le cylindre soit couché horizontalement
-    const wheelGeo = new THREE.CylinderGeometry(0.052, 0.052, 0.075, 32);
+    const wheelGeo = new THREE.CylinderGeometry(0.046, 0.046, 0.068, 32);
     wheelGeo.rotateZ(Math.PI / 2);
 
     for (let i = 0; i < 4; i++) {
-      const wheelMat = new THREE.MeshPhongMaterial({ map: digitTexture, shininess: 50 });
+      const wheelMat = new THREE.MeshStandardMaterial({ map: digitTexture, metalness: 0.6, roughness: 0.3 });
       const wheel = new THREE.Mesh(wheelGeo, wheelMat);
       
-      // Alignement parfait des 4 molettes sur la face avant
-      wheel.position.set(-0.16 + i * 0.106, 0, 0.04);
+      wheel.position.set(-0.135 + i * 0.09, -0.01, 0.038);
       wheel.userData = { index: i };
       
       padlockGroup.add(wheel);
       wheels.push(wheel);
     }
 
-    // ANCRAGE IMAGE
+    // ANCRAGE MINDAR
     const anchor = mindarThree.addAnchor(0);
     anchor.group.add(padlockGroup);
 
     anchor.onTargetFound = () => {
-      statusTitle.textContent = "Cible Détectée !";
-      statusTitle.style.color = "#00ff88";
-      statusDesc.textContent = "Composez le code secret (4207) en touchant les 4 molettes.";
+      statusTitle.textContent = "CIBLE DÉTECTÉE";
+      statusTitle.style.color = "#d4af37";
+      statusDesc.textContent = "Composez le code secret (4207). Vous pouvez glisser pour tourner le cadenas.";
     };
 
     anchor.onTargetLost = () => {
-      statusTitle.textContent = "Recherche d'image";
-      statusTitle.style.color = "#ffcc00";
+      statusTitle.textContent = "RECHERCHE EN COURS";
+      statusTitle.style.color = "#ffaa00";
       statusDesc.textContent = "Pointez la caméra vers l'image du livre.";
     };
 
-    // LOGIQUE DE ROTATION (Défilement vertical sur l'axe X)
+    // LOGIQUE DE DÉVERROUILLAGE
     function rotateWheel(index) {
       unlockAudio();
       currentDigits[index] = (currentDigits[index] + 1) % 10;
-      
-      // Rotation propre autour de l'axe X
-      wheels[index].rotation.x = currentDigits[index] * (Math.PI * 2 / 10);
+      targetRotations[index] = currentDigits[index] * (Math.PI * 2 / 10);
 
       if (positionalClick.isPlaying) positionalClick.stop();
       positionalClick.play();
@@ -277,66 +337,151 @@
       checkCode();
     }
 
+    let isUnlocked = false;
+    let targetShackleY = 0.07;
+
     function checkCode() {
-      if (currentDigits.join('') === SECRET_CODE) {
-        shackle.position.y = 0.30; // L'anse monte
-        bodyMat.color.setHex(0x10b981); // Le cadenas devient vert
+      if (currentDigits.join('') === SECRET_CODE && !isUnlocked) {
+        isUnlocked = true;
+        targetShackleY = 0.18;
+
+        ledMat.color.setHex(0x00ff88);
+        ledMat.emissive.setHex(0x00ff88);
+        ledMat.emissiveIntensity = 3.0;
+
         statusTitle.textContent = "DÉVERROUILLÉ !";
         statusTitle.style.color = "#00ff88";
-        statusDesc.textContent = "Bravo, vous avez ouvert le cadenas !";
+        statusDesc.textContent = "Bravo, la combinaison est correcte.";
 
         if (positionalSuccess.isPlaying) positionalSuccess.stop();
         positionalSuccess.play();
       }
     }
 
-    // DÉTECTION DU CLIC TACTILE
+    // 5. GESTION DES GESTES (ROTATION, ZOOM, CLIC MOLETTES)
+    let isPointerDown = false;
+    let pointerStartX = 0, pointerStartY = 0;
+    let hasDragged = false;
+    let initialPinchDistance = null;
+    let initialScale = padlockGroup.scale.x;
+
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
 
-    function handleInteraction(clientX, clientY) {
-      mouse.x = (clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+    // Zoom à la molette sur ordinateur
+    window.addEventListener('wheel', (e) => {
+      let scale = padlockGroup.scale.x - e.deltaY * 0.001;
+      scale = Math.max(0.3, Math.min(2.5, scale));
+      padlockGroup.scale.set(scale, scale, scale);
+    }, { passive: true });
 
-      raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(wheels);
-
-      if (intersects.length > 0) {
-        rotateWheel(intersects[0].object.userData.index);
-      }
-    }
-
+    // Début de contact (souris / 1 ou 2 doigts)
     window.addEventListener('pointerdown', (e) => {
-      if (e.target.tagName === 'BUTTON' || e.target.closest('#hud')) return;
+      if (e.target.id === 'start-btn') return;
       unlockAudio();
-      handleInteraction(e.clientX, e.clientY);
+
+      isPointerDown = true;
+      hasDragged = false;
+      pointerStartX = e.clientX;
+      pointerStartY = e.clientY;
     });
 
-    // DÉMARRAGE DU SCRIPT
+    // Déplacement
+    window.addEventListener('pointermove', (e) => {
+      if (!isPointerDown) return;
+
+      const dx = e.clientX - pointerStartX;
+      const dy = e.clientY - pointerStartY;
+
+      // Si le doigt bouge de plus de 5px, c'est une rotation et non un simple clic
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+        hasDragged = true;
+      }
+
+      if (hasDragged) {
+        padlockGroup.rotation.y += dx * 0.008;
+        padlockGroup.rotation.x += dy * 0.008;
+
+        // Limiter la rotation verticale pour éviter les retournements bizarres
+        padlockGroup.rotation.x = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, padlockGroup.rotation.x));
+
+        pointerStartX = e.clientX;
+        pointerStartY = e.clientY;
+      }
+    });
+
+    // Fin du contact
+    window.addEventListener('pointerup', (e) => {
+      if (e.target.id === 'start-btn') return;
+
+      if (!hasDragged && isPointerDown) {
+        // Clic simple : tester l'interaction avec les molettes
+        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(wheels);
+
+        if (intersects.length > 0) {
+          rotateWheel(intersects[0].object.userData.index);
+        }
+      }
+
+      isPointerDown = false;
+      initialPinchDistance = null;
+    });
+
+    // Pincer pour zoomer (sur mobile)
+    window.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 2) {
+        hasDragged = true;
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (!initialPinchDistance) {
+          initialPinchDistance = distance;
+          initialScale = padlockGroup.scale.x;
+        } else {
+          const factor = distance / initialPinchDistance;
+          let newScale = initialScale * factor;
+          newScale = Math.max(0.3, Math.min(2.5, newScale));
+          padlockGroup.scale.set(newScale, newScale, newScale);
+        }
+      }
+    }, { passive: true });
+
+    // DÉMARRAGE DE L'APPLICATION
     startBtn.addEventListener('click', async () => {
       unlockAudio();
       startBtn.style.display = 'none';
-      statusTitle.textContent = "Chargement des cibles...";
-      statusDesc.textContent = "Analyse du fichier targets.mind...";
+      statusTitle.textContent = "CHARGEMENT";
+      statusDesc.textContent = "Initialisation du moteur 3D...";
 
       try {
         const response = await fetch('./targets.mind');
-        if (!response.ok) {
-          throw new Error("Fichier 'targets.mind' introuvable sur le serveur.");
-        }
+        if (!response.ok) throw new Error("Fichier 'targets.mind' introuvable.");
 
         await mindarThree.start();
-        statusTitle.textContent = "Recherche d'image";
-        statusTitle.style.color = "#ffcc00";
-        statusDesc.textContent = "Pointez votre caméra vers l'image du livre.";
+        statusTitle.textContent = "RECHERCHE EN COURS";
+        statusTitle.style.color = "#ffaa00";
+        statusDesc.textContent = "Pointez la caméra vers l'image du livre.";
 
         renderer.setAnimationLoop(() => {
+          // Rotation fluide des molettes
+          for (let i = 0; i < 4; i++) {
+            wheels[i].rotation.x += (targetRotations[i] - wheels[i].rotation.x) * 0.2;
+          }
+
+          // Coulissement de l'anse
+          shackleGroup.position.y += (targetShackleY - shackleGroup.position.y) * 0.1;
+
           renderer.render(scene, camera);
         });
 
       } catch (err) {
         console.error(err);
-        statusTitle.textContent = "Erreur de chargement";
+        statusTitle.textContent = "ERREUR";
         statusTitle.style.color = "#ff4444";
         statusDesc.textContent = err.message;
       }
