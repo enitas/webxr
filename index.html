@@ -198,7 +198,7 @@
       return new THREE.CanvasTexture(canvas);
     }
 
-    // 4. CHARGEMENT MODÈLE 3D AVEC DÉCODEUR DRACO
+    // 4. CHARGEMENT MODÈLE 3D
     const mainGroup = new THREE.Group();
     const SECRET_NUMBER = "314";
 
@@ -217,31 +217,41 @@
           (gltf) => {
             const model = gltf.scene;
 
+            // Appliquer l'échelle au modèle
+            const tempBox = new THREE.Box3().setFromObject(model);
+            const tempSize = tempBox.getSize(new THREE.Vector3());
+            const maxDim = Math.max(tempSize.x, tempSize.y, tempSize.z);
+            const targetScale = 0.8 / (maxDim || 1);
+            model.scale.setScalar(targetScale);
+
+            // Recalculer la boîte englobante à la bonne échelle
             const box = new THREE.Box3().setFromObject(model);
             const size = box.getSize(new THREE.Vector3());
             const center = box.getCenter(new THREE.Vector3());
 
-            model.position.x -= center.x;
-            model.position.y -= box.min.y;
-            model.position.z -= center.z;
+            // Aligner le bas de la pièce à y = 0
+            model.position.x = -center.x;
+            model.position.y = -box.min.y;
+            model.position.z = -center.z;
 
-            const maxDim = Math.max(size.x, size.y, size.z);
-            const targetScale = 0.8 / (maxDim || 1);
-            model.scale.setScalar(targetScale);
-
-            const baseRadius = (Math.max(size.x, size.z) * targetScale) / 2;
+            // Créer le socle collé directement sous la pièce
+            const baseRadius = Math.max(size.x, size.z) / 2;
             const bottomGeo = new THREE.CircleGeometry(Math.max(baseRadius, 0.25), 36);
             const numTexture = createBottomNumberTexture(SECRET_NUMBER);
             const bottomMat = new THREE.MeshBasicMaterial({ map: numTexture, side: THREE.DoubleSide });
             const bottomMesh = new THREE.Mesh(bottomGeo, bottomMat);
             
+            // Orientation et collage sous le socle
             bottomMesh.rotation.x = Math.PI / 2;
-            bottomMesh.position.y = 0.03;
+            bottomMesh.rotation.z = Math.PI;
+            bottomMesh.position.y = -0.001;
 
             const modelContainer = new THREE.Group();
             modelContainer.add(model);
             modelContainer.add(bottomMesh);
-            modelContainer.position.y = -(size.y * targetScale) / 2;
+            
+            // Centrer verticalement sur l'ancre AR
+            modelContainer.position.y = -size.y / 2;
 
             mainGroup.add(modelContainer);
             resolve();
@@ -261,7 +271,7 @@
       try {
         await loadModel('./cavalier.glb');
       } catch (e) {
-        console.warn("Échec cavalier.glb local, tentative de secours sur le modèle distant...", e);
+        console.warn("Échec cavalier.glb local, secours sur modèle distant...", e);
         try {
           await loadModel(FALLBACK_URL);
         } catch (errFallback) {
@@ -286,7 +296,7 @@
       statusDesc.textContent = "Pointez la caméra vers l'image cible.";
     };
 
-    // 5. CONTRÔLES TACTILES
+    // 5. CONTRÔLES TACTILES (ZOOM & ROTATION)
     let currentScale = 1.0;
     let isPointerDown = false;
     let lastPointerX = 0, lastPointerY = 0;
