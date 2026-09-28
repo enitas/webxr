@@ -43,7 +43,6 @@
       text-align: center;
       box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
       z-index: 10;
-      transition: all 0.3s ease;
     }
     #status-title {
       font-size: 15px;
@@ -118,11 +117,11 @@
     const { renderer, scene, camera } = mindarThree;
 
     // ÉCLAIRAGE
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.6);
     scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 2.0);
-    dirLight.position.set(2, 4, 3);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 2.2);
+    dirLight.position.set(2, 5, 4);
     scene.add(dirLight);
 
     // AUDIO SPATIAL
@@ -141,19 +140,19 @@
       const data = buffer.getChannelData(0);
       for (let i = 0; i < data.length; i++) {
         const t = i / sampleRate;
-        data[i] = Math.sin(2 * Math.PI * 220 * t) * Math.exp(-t * 90);
+        data[i] = Math.sin(2 * Math.PI * 300 * t) * Math.exp(-t * 100);
       }
       return buffer;
     }
 
     function createSuccessBuffer(audioCtx) {
       const sampleRate = audioCtx.sampleRate;
-      const buffer = audioCtx.createBuffer(1, sampleRate * 0.4, sampleRate);
+      const buffer = audioCtx.createBuffer(1, sampleRate * 0.5, sampleRate);
       const data = buffer.getChannelData(0);
       for (let i = 0; i < data.length; i++) {
         const t = i / sampleRate;
-        const freq = 523.25 + (t / 0.4) * 523.25;
-        data[i] = Math.sin(2 * Math.PI * freq * t) * Math.exp(-t * 5);
+        const freq = 523.25 + (t / 0.5) * 523.25;
+        data[i] = Math.sin(2 * Math.PI * freq * t) * Math.exp(-t * 4);
       }
       return buffer;
     }
@@ -167,50 +166,56 @@
     positionalSuccess.setBuffer(createSuccessBuffer(listener.context));
     positionalSuccess.setRefDistance(0.5);
 
-    // CADENAS 3D (GEOMETRIE ET POSITIONNEMENT CORRIGÉS)
+    // CADENAS 3D (STRUCTURE ET ALIGNEMENT)
     const padlockGroup = new THREE.Group();
-    padlockGroup.scale.set(0.7, 0.7, 0.7);
+    padlockGroup.scale.set(0.75, 0.75, 0.75);
 
     padlockGroup.add(positionalClick);
     padlockGroup.add(positionalSuccess);
 
-    // 1. Corps du cadenas (Profondeur Z = 0.08)
-    const bodyMat = new THREE.MeshPhongMaterial({ color: 0xd4af37, shininess: 90 });
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.32, 0.08), bodyMat);
+    // 1. Corps du cadenas en laiton
+    const bodyMat = new THREE.MeshPhongMaterial({ color: 0xd4af37, shininess: 80 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.36, 0.12), bodyMat);
     padlockGroup.add(body);
 
-    // 2. Anse du cadenas
-    const shackleMat = new THREE.MeshPhongMaterial({ color: 0xeeeeee, shininess: 120 });
-    const shackle = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.022, 16, 32, Math.PI), shackleMat);
-    shackle.position.set(0, 0.16, 0);
+    // 2. Plaque noire arrière pour les molettes
+    const slotMat = new THREE.MeshBasicMaterial({ color: 0x111116 });
+    const slotPlate = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.16, 0.02), slotMat);
+    slotPlate.position.set(0, 0, 0.051);
+    padlockGroup.add(slotPlate);
+
+    // 3. Anse chromée
+    const shackleMat = new THREE.MeshPhongMaterial({ color: 0xe6e6e6, shininess: 120 });
+    const shackle = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.024, 16, 32, Math.PI), shackleMat);
+    shackle.position.set(0, 0.18, 0);
     padlockGroup.add(shackle);
 
-    // 3. Texture haute lisibilité pour les molettes
+    // 4. Génération de la texture des chiffres (Bien orientés)
     function createDigitTexture() {
       const canvas = document.createElement('canvas');
       canvas.width = 1280;
       canvas.height = 128;
       const ctx = canvas.getContext('2d');
 
-      // Fond blanc
-      ctx.fillStyle = '#ffffff';
+      // Fond argenté / gris très clair
+      ctx.fillStyle = '#e2e8f0';
       ctx.fillRect(0, 0, 1280, 128);
 
-      // Bordures haut/bas noires
-      ctx.fillStyle = '#111111';
-      ctx.fillRect(0, 0, 1280, 10);
-      ctx.fillRect(0, 118, 1280, 10);
+      // Lignes de séparation haut et bas
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(0, 0, 1280, 8);
+      ctx.fillRect(0, 120, 1280, 8);
 
-      // Chiffres 0 à 9
-      ctx.fillStyle = '#000000';
-      ctx.font = 'Bold 82px sans-serif';
+      // Dessin des chiffres 0 à 9
+      ctx.fillStyle = '#0f172a';
+      ctx.font = '900 76px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
       for (let i = 0; i < 10; i++) {
         ctx.save();
         ctx.translate(i * 128 + 64, 64);
-        ctx.rotate(-Math.PI / 2);
+        ctx.rotate(Math.PI / 2); // Orienté pour l'axe horizontal
         ctx.fillText(i.toString(), 0, 0);
         ctx.restore();
       }
@@ -220,22 +225,22 @@
       return texture;
     }
 
-    // 4. Molettes (Positionnées en Z = 0.035 pour sortir en relief)
+    // 5. Création des 4 molettes (Axe X horizontal)
     const wheels = [];
     const currentDigits = [0, 0, 0, 0];
     const SECRET_CODE = "4207";
     const digitTexture = createDigitTexture();
-    
-    // Cylindres plus grands (rayon 0.058)
-    const wheelGeo = new THREE.CylinderGeometry(0.058, 0.058, 0.08, 32);
+
+    // Géométrie tournée de 90° sur Z pour que le cylindre soit couché horizontalement
+    const wheelGeo = new THREE.CylinderGeometry(0.052, 0.052, 0.075, 32);
+    wheelGeo.rotateZ(Math.PI / 2);
 
     for (let i = 0; i < 4; i++) {
-      const wheelMat = new THREE.MeshPhongMaterial({ map: digitTexture, shininess: 40 });
+      const wheelMat = new THREE.MeshPhongMaterial({ map: digitTexture, shininess: 50 });
       const wheel = new THREE.Mesh(wheelGeo, wheelMat);
-      wheel.rotation.z = Math.PI / 2;
       
-      // Placées sur la face avant (Z = 0.035)
-      wheel.position.set(-0.18 + i * 0.12, 0, 0.035);
+      // Alignement parfait des 4 molettes sur la face avant
+      wheel.position.set(-0.16 + i * 0.106, 0, 0.04);
       wheel.userData = { index: i };
       
       padlockGroup.add(wheel);
@@ -258,11 +263,13 @@
       statusDesc.textContent = "Pointez la caméra vers l'image du livre.";
     };
 
-    // LOGIQUE DE ROTATION DU CODE
+    // LOGIQUE DE ROTATION (Défilement vertical sur l'axe X)
     function rotateWheel(index) {
       unlockAudio();
       currentDigits[index] = (currentDigits[index] + 1) % 10;
-      wheels[index].rotation.y = -(currentDigits[index] * (Math.PI * 2 / 10));
+      
+      // Rotation propre autour de l'axe X
+      wheels[index].rotation.x = currentDigits[index] * (Math.PI * 2 / 10);
 
       if (positionalClick.isPlaying) positionalClick.stop();
       positionalClick.play();
@@ -272,18 +279,18 @@
 
     function checkCode() {
       if (currentDigits.join('') === SECRET_CODE) {
-        shackle.position.y = 0.28;
-        bodyMat.color.setHex(0x00cc66);
+        shackle.position.y = 0.30; // L'anse monte
+        bodyMat.color.setHex(0x10b981); // Le cadenas devient vert
         statusTitle.textContent = "DÉVERROUILLÉ !";
         statusTitle.style.color = "#00ff88";
-        statusDesc.textContent = "Bravo, le cadenas est ouvert !";
+        statusDesc.textContent = "Bravo, vous avez ouvert le cadenas !";
 
         if (positionalSuccess.isPlaying) positionalSuccess.stop();
         positionalSuccess.play();
       }
     }
 
-    // DELECTATION DES TAPS SUR ECRAN
+    // DÉTECTION DU CLIC TACTILE
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
 
@@ -315,7 +322,7 @@
       try {
         const response = await fetch('./targets.mind');
         if (!response.ok) {
-          throw new Error("Fichier 'targets.mind' introuvable.");
+          throw new Error("Fichier 'targets.mind' introuvable sur le serveur.");
         }
 
         await mindarThree.start();
