@@ -15,14 +15,30 @@
     #info {
       position: absolute;
       top: 15px;
-      width: 100%;
+      left: 10px;
+      right: 10px;
       text-align: center;
       color: #ffffff;
-      z-index: 10;
-      pointer-events: none;
-      font-size: 15px;
+      z-index: 100;
+      font-size: 14px;
       font-weight: bold;
       text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+      word-wrap: break-word;
+    }
+    #ar-button {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 24px;
+      border: 1px solid #ffffff;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.8);
+      color: #ffffff;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      z-index: 100;
     }
   </style>
 
@@ -36,13 +52,16 @@
   </script>
 </head>
 <body>
-  <div id="info">Touchez les molettes pour composer le code (4207)</div>
+  <div id="info">Cliquez sur "LANCER L'AR" pour démarrer</div>
+  <button id="ar-button">LANCER L'AR</button>
 
   <script type="module">
     import * as THREE from 'three';
-    import { ARButton } from 'three/addons/webxr/ARButton.js';
 
-    // 1. SCÈNE & MOTEUR DE RENDU
+    const infoDiv = document.getElementById('info');
+    const arBtn = document.getElementById('ar-button');
+
+    // 1. SCÈNE ET RENDU
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
     camera.position.set(0, 0, 0.85);
@@ -52,13 +71,6 @@
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.xr.enabled = true;
     document.body.appendChild(renderer.domElement);
-
-    // BOUTON AR (avec optionalFeatures au lieu de requiredFeatures)
-    const arButton = ARButton.createButton(renderer, {
-      optionalFeatures: ['hit-test', 'dom-overlay'],
-      domOverlay: { root: document.body }
-    });
-    document.body.appendChild(arButton);
 
     // ÉCLAIRAGE
     const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.5);
@@ -174,7 +186,7 @@
       wheels.push(wheel);
     }
 
-    // 4. ANNEAU VISUEL DE DÉTECTION (HIT-TEST)
+    // 4. DÉTECTION DE SURFACE (HIT-TEST)
     const reticleGeo = new THREE.RingGeometry(0.08, 0.1, 32).rotateX(-Math.PI / 2);
     const reticleMat = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
     const reticle = new THREE.Mesh(reticleGeo, reticleMat);
@@ -185,7 +197,7 @@
     let hitTestSource = null;
     let hitTestSourceRequested = false;
 
-    // 5. LOGIQUE MÉCANIQUE
+    // 5. MÉCANIQUE
     function rotateWheel(index) {
       unlockAudio();
       currentDigits[index] = (currentDigits[index] + 1) % 10;
@@ -201,22 +213,67 @@
       if (currentDigits.join('') === SECRET_CODE) {
         shackle.position.y = 0.28;
         bodyMat.color.setHex(0x228b22);
-        const info = document.getElementById('info');
-        info.textContent = "CADENAS DÉVERROUILLÉ !";
-        info.style.color = "#00ff00";
+        infoDiv.textContent = "CADENAS DÉVERROUILLÉ !";
+        infoDiv.style.color = "#00ff00";
 
         if (positionalSuccess.isPlaying) positionalSuccess.stop();
         positionalSuccess.play();
       }
     }
 
-    // 6. RAYCASTING & CONTRÔLEURS
+    // 6. GESTION DU BOUTON ET DIAGNOSTIC DES ERREURS AR
+    async function initAR() {
+      unlockAudio();
+
+      if (!navigator.xr) {
+        infoDiv.style.color = "#ff4444";
+        infoDiv.textContent = "Erreur: WebXR n'est pas supporté par ce navigateur.";
+        return;
+      }
+
+      try {
+        const supported = await navigator.xr.isSessionSupported('immersive-ar');
+        if (!supported) {
+          infoDiv.style.color = "#ff4444";
+          infoDiv.textContent = "Erreur: Le mode 'immersive-ar' est désactivé ou non supporté sur votre appareil.";
+          return;
+        }
+
+        infoDiv.style.color = "#ffff00";
+        infoDiv.textContent = "Lancement de la session AR...";
+
+        // Demande de session AR avec capture d'erreur explicite
+        const session = await navigator.xr.requestSession('immersive-ar', {
+          optionalFeatures: ['hit-test', 'dom-overlay'],
+          domOverlay: { root: document.body }
+        });
+
+        renderer.xr.setSession(session);
+        arBtn.style.display = 'none';
+        infoDiv.style.color = "#ffffff";
+        infoDiv.textContent = "Mode AR actif ! Touchez l'écran pour positionner le cadenas.";
+
+        session.addEventListener('end', () => {
+          arBtn.style.display = 'block';
+          infoDiv.style.color = "#ffffff";
+          infoDiv.textContent = "Session AR terminée.";
+        });
+
+      } catch (err) {
+        console.error("Erreur AR:", err);
+        infoDiv.style.color = "#ff4444";
+        infoDiv.innerHTML = `<b>ERREUR AR :</b><br>${err.name} - ${err.message}`;
+      }
+    }
+
+    arBtn.addEventListener('click', initAR);
+
+    // 7. INTERACTIONS ET RAYCASTING
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
 
-    // Tap classique (hors AR)
     window.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('button')) return;
+      if (e.target.id === 'ar-button') return;
 
       unlockAudio();
       mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
@@ -229,7 +286,6 @@
       }
     });
 
-    // Tap en mode AR
     const controller = renderer.xr.getController(0);
     controller.addEventListener('select', () => {
       unlockAudio();
@@ -250,7 +306,7 @@
     });
     scene.add(controller);
 
-    // 7. GESTES TACTILES SÉCURISÉS
+    // 8. GESTES TACTILES
     let previousTouch = null;
     let initialPinchDistance = null;
     let initialScale = 1;
@@ -262,7 +318,7 @@
     }
 
     window.addEventListener('touchstart', (e) => {
-      if (e.target.closest('button')) return;
+      if (e.target.id === 'ar-button') return;
 
       if (e.touches.length === 1) {
         previousTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -271,10 +327,10 @@
         initialPinchDistance = getTouchDistance(e.touches);
         initialScale = padlockGroup.scale.x;
       }
-    }, { passive: true });
+    });
 
     window.addEventListener('touchmove', (e) => {
-      if (e.target.closest('button')) return;
+      if (e.target.id === 'ar-button') return;
 
       if (e.touches.length === 1 && previousTouch) {
         const deltaX = e.touches[0].clientX - previousTouch.x;
@@ -286,7 +342,7 @@
         const newScale = Math.min(Math.max(initialScale * factor, 0.2), 3.0);
         padlockGroup.scale.set(newScale, newScale, newScale);
       }
-    }, { passive: true });
+    });
 
     window.addEventListener('touchend', (e) => {
       if (e.touches.length < 2) initialPinchDistance = null;
@@ -299,7 +355,7 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // 8. BOUCLE D'ANIMATION ET DIAGNOSTIC WEBXR
+    // 9. BOUCLE D'ANIMATION
     renderer.setAnimationLoop((timestamp, frame) => {
       if (frame) {
         const session = renderer.xr.getSession();
@@ -308,9 +364,7 @@
           session.requestReferenceSpace('viewer').then((viewerSpace) => {
             session.requestHitTestSource({ space: viewerSpace }).then((source) => {
               hitTestSource = source;
-            }).catch((err) => {
-              console.warn("Hit-test non supporté sur cet appareil:", err);
-            });
+            }).catch(() => {});
           }).catch(() => {});
 
           session.addEventListener('end', () => {
