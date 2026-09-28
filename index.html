@@ -120,7 +120,6 @@
 
     const { renderer, scene, camera } = mindarThree;
 
-    // Réglage du rendu pour des couleurs et ombres réalistes
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
 
@@ -137,10 +136,10 @@
     scene.add(fillLight);
 
     const bottomLight = new THREE.DirectionalLight(0xffeedd, 2.5);
-    bottomLight.position.set(0, -5, 0); // Éclairage du dessous pour lire le code
+    bottomLight.position.set(0, -5, 0);
     scene.add(bottomLight);
 
-    // 3. TEXTURE GRAVÉE DU CODE SOUS LE SOCLE
+    // 3. TEXTURE DU CODE SOUS LE SOCLE
     function createBottomNumberTexture(numberStr) {
       const canvas = document.createElement('canvas');
       canvas.width = 512;
@@ -166,54 +165,66 @@
       return new THREE.CanvasTexture(canvas);
     }
 
-    // 4. GROUPE PRINCIPAL ET CHARGEMENT DU FICHIER .GLB
+    // 4. CHARGEMENT ROBUSTE DU FICHIER .GLB
     const mainGroup = new THREE.Group();
     const SECRET_NUMBER = "314";
-
     const loader = new GLTFLoader();
 
     function loadCustomGLB() {
       return new Promise((resolve, reject) => {
-        loader.load('./cavalier.glb', (gltf) => {
-          const model = gltf.scene;
+        // Tente de charger le fichier dans le dossier courant
+        const modelPath = 'cavalier.glb';
 
-          // CALCUL DE LA BOÎTE ENGLOBANTE (Bounding Box)
-          const box = new THREE.Box3().setFromObject(model);
-          const size = box.getSize(new THREE.Vector3());
-          const center = box.getCenter(new THREE.Vector3());
+        loader.load(
+          modelPath,
+          (gltf) => {
+            const model = gltf.scene;
 
-          // Recentrage précis du modèle 3D au point (0, 0, 0)
-          model.position.x -= center.x;
-          model.position.y -= box.min.y; // Aligne la base sur y = 0
-          model.position.z -= center.z;
+            // Recalcul du centrage et de la taille
+            const box = new THREE.Box3().setFromObject(model);
+            const size = box.getSize(new THREE.Vector3());
+            const center = box.getCenter(new THREE.Vector3());
 
-          // Normalisation automatique de la taille (hauteur cible ~0.8 unité)
-          const maxDim = Math.max(size.x, size.y, size.z);
-          const targetScale = 0.8 / maxDim;
-          model.scale.setScalar(targetScale);
+            model.position.x -= center.x;
+            model.position.y -= box.min.y;
+            model.position.z -= center.z;
 
-          // CRÉATION DU SOCLE GRAVÉ SOUS LA PIÈCE (adapté à la largeur du modèle)
-          const baseRadius = (Math.max(size.x, size.z) * targetScale) / 2;
-          const bottomGeo = new THREE.CircleGeometry(Math.max(baseRadius, 0.25), 36);
-          const numTexture = createBottomNumberTexture(SECRET_NUMBER);
-          const bottomMat = new THREE.MeshBasicMaterial({ map: numTexture, side: THREE.DoubleSide });
-          const bottomMesh = new THREE.Mesh(bottomGeo, bottomMat);
-          
-          bottomMesh.rotation.x = Math.PI / 2;
-          bottomMesh.position.y = -0.005; // Placé juste sous la pièce
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const targetScale = 0.8 / (maxDim || 1);
+            model.scale.setScalar(targetScale);
 
-          const modelContainer = new THREE.Group();
-          modelContainer.add(model);
-          modelContainer.add(bottomMesh);
+            // Création du disque du socle
+            const baseRadius = (Math.max(size.x, size.z) * targetScale) / 2;
+            const bottomGeo = new THREE.CircleGeometry(Math.max(baseRadius, 0.25), 36);
+            const numTexture = createBottomNumberTexture(SECRET_NUMBER);
+            const bottomMat = new THREE.MeshBasicMaterial({ map: numTexture, side: THREE.DoubleSide });
+            const bottomMesh = new THREE.Mesh(bottomGeo, bottomMat);
+            
+            bottomMesh.rotation.x = Math.PI / 2;
+            bottomMesh.position.y = -0.005;
 
-          // Recentrer le pivot global du groupe pour que la rotation tourne autour du centre du cavalier
-          modelContainer.position.y = -(size.y * targetScale) / 2;
+            const modelContainer = new THREE.Group();
+            modelContainer.add(model);
+            modelContainer.add(bottomMesh);
+            modelContainer.position.y = -(size.y * targetScale) / 2;
 
-          mainGroup.add(modelContainer);
-          resolve();
-        }, undefined, (error) => {
-          reject("Impossible de charger 'cavalier.glb'. Vérifiez le nom et l'emplacement du fichier.");
-        });
+            mainGroup.add(modelContainer);
+            resolve();
+          },
+          (xhr) => {
+            if (xhr.lengthComputable && xhr.total > 0) {
+              const percent = Math.round((xhr.loaded / xhr.total) * 100);
+              statusDesc.textContent = `Téléchargement du fichier 3D : ${percent}%`;
+            } else {
+              statusDesc.textContent = `Téléchargement en cours... (${(xhr.loaded / 1024 / 1024).toFixed(1)} Mo)`;
+            }
+          },
+          (error) => {
+            console.error("Erreur de chargement GLTF:", error);
+            const detail = error.message || (error.target && error.target.status ? `HTTP ${error.target.status}` : "Format ou réseau non valide");
+            reject(`Erreur 'cavalier.glb' : ${detail}`);
+          }
+        );
       });
     }
 
@@ -224,7 +235,7 @@
     anchor.onTargetFound = () => {
       statusTitle.textContent = "CAVALIER DÉTECTÉ";
       statusTitle.style.color = "#d4af37";
-      statusDesc.textContent = "Pincez pour zoomer. Tournez la pièce pour inspecter le dessous.";
+      statusDesc.textContent = "Pincez pour zoomer. Tournez la pièce pour voir en dessous.";
     };
 
     anchor.onTargetLost = () => {
@@ -233,7 +244,7 @@
       statusDesc.textContent = "Pointez la caméra vers l'image cible.";
     };
 
-    // 5. CONTRÔLES TACTILES FLUIDES (ROTATION 360° & ZOOM)
+    // 5. CONTRÔLES TACTILES (ROTATION ET ZOOM)
     let currentScale = 1.0;
     let isPointerDown = false;
     let lastPointerX = 0, lastPointerY = 0;
@@ -245,7 +256,6 @@
       return Math.hypot(dx, dy);
     }
 
-    // Zoom molette (Desktop)
     window.addEventListener('wheel', (e) => {
       e.preventDefault();
       const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
@@ -253,10 +263,8 @@
       mainGroup.scale.set(currentScale, currentScale, currentScale);
     }, { passive: false });
 
-    // Tactile Mobile
     window.addEventListener('touchstart', (e) => {
       if (e.target.id === 'start-btn') return;
-
       if (e.touches.length === 1) {
         isPointerDown = true;
         lastPointerX = e.touches[0].clientX;
@@ -292,7 +300,6 @@
       if (e.touches.length === 0) isPointerDown = false;
     });
 
-    // Souris PC
     let isMouseDown = false;
     window.addEventListener('mousedown', (e) => {
       if (e.target.id === 'start-btn') return;
@@ -319,7 +326,7 @@
     startBtn.addEventListener('click', async () => {
       startBtn.style.display = 'none';
       statusTitle.textContent = "CHARGEMENT";
-      statusDesc.textContent = "Chargement du fichier cavalier.glb...";
+      statusDesc.textContent = "Initialisation...";
 
       try {
         const response = await fetch('./targets.mind');
